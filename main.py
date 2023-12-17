@@ -21,14 +21,14 @@ def fetch_page(page_id):
     page_data = response.json()
     return page_data
 
-def update_page(page_id, properties):
-    url = f"{NOTION_API_PREFIX}/pages/{page_id}"
-    data = {
-        "properties": properties
-    }
-    response = requests.patch(url, headers=headers, json=data)
-    updated_page_data = response.json()
-    return updated_page_data
+# def update_page(page_id, properties):
+#     url = f"{NOTION_API_PREFIX}/pages/{page_id}"
+#     data = {
+#         "properties": properties
+#     }
+#     response = requests.patch(url, headers=headers, json=data)
+#     updated_page_data = response.json()
+#     return updated_page_data
 
 def search_for_pages():
     """
@@ -40,13 +40,13 @@ def search_for_pages():
     """
 
     search_params = {"filter": {
-        "value": "page",
-        "property": "object"
-    },
+            "value": "page",
+            "property": "object"
+        },
         "sort": {
-        "direction": "ascending",
-        "timestamp": "last_edited_time"
-    }
+            "direction": "descending",
+            "timestamp": "last_edited_time"
+        }
     }
     search_response = requests.post(
         f'{NOTION_API_PREFIX}/search',
@@ -59,17 +59,20 @@ def search_for_pages():
 def fetch_block_children(block_id):
     url = f"{NOTION_API_PREFIX}/blocks/{block_id}/children"
     response = requests.get(url, headers=headers)
-    block_data = response.json()
+    response = response.json()
 
-    has_more = block_data["has_more"]
-    next_cursor = block_data["next_cursor"]
+    has_more = response["has_more"]
+    next_cursor = response["next_cursor"]
+
+    print("RESPONSE:")
+    print(json.dumps(response, indent=4, sort_keys=True))
 
     children_data = {
         "has_more": has_more,
         "next_cursor": next_cursor,
     }
 
-    for child in block_data["results"]:
+    for child in response["results"]:
         children_data[child["id"]] = {
             "has_children": child["has_children"],
             "type": child["type"]
@@ -83,10 +86,10 @@ if __name__ == "__main__":
     output = search_for_pages()
 
     # debug: beautify and print json output
-    print(json.dumps(output, indent=4, sort_keys=True))
+    print(json.dumps(output["results"][0], indent=4, sort_keys=True))
 
     # get an arbitrary page and print out the first-layer children on that page (TODO: recurse through block children to get all data)
-    page_id = output["results"][2]["id"]
+    page_id = output["results"][0]["id"]
     print(f"Page ID: {page_id}")
     block_children = fetch_block_children(page_id)
     print(json.dumps(block_children, indent=4, sort_keys=True))
