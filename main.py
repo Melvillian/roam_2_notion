@@ -77,14 +77,16 @@ def fetch_block_children(block_id):
     
     return children_data
 
-output = search_for_pages()
+if __name__ == "__main__":
+    # get paginated pages of metadata (TODO: handle pagination),
+    # in particular the page ID's
+    output = search_for_pages()
 
+    # debug: beautify and print json output
+    print(json.dumps(output, indent=4, sort_keys=True))
 
-# beautify json output
-print(json.dumps(output, indent=4, sort_keys=True))
-
-page_id = output["results"][2]["id"]
-print(f"Page ID: {page_id}")
-
-block_children = fetch_block_children(page_id)
-print(json.dumps(block_children, indent=4, sort_keys=True))
+    # get an arbitrary page and print out the first-layer children on that page (TODO: recurse through block children to get all data)
+    page_id = output["results"][2]["id"]
+    print(f"Page ID: {page_id}")
+    block_children = fetch_block_children(page_id)
+    print(json.dumps(block_children, indent=4, sort_keys=True))
