@@ -239,9 +239,179 @@ def fetch_block_children(block_id, page_name):
     """
     Given a Block ID (which might also be a Page ID), return a dict keyed by all of the given
     block's childrens' IDs, and the child's data, THOUGH IT WILL ONLY RETURN CHILDREN THAT ARE
-    PARAGRAPHS. The important value will be the `paragraph` field, which contains an array of
+    PARAGRAPHS.
+    
+    The important value will be the `paragraph` field, which contains an array of
     objects of type `text` and `mention` (there could also be equation in the original block, but
     we ignore those)
+
+    Returns:
+        dict: a dict keyed by block ID, and the value is a dict containing the block's type. For example:
+        {
+            "blocks": {
+                "13b5fa46-4308-4e19-a22b-67d440a017b6": {
+                    "has_children": false,
+                    "paragraph": {
+                        "color": "default",
+                        "text": []
+                    },
+                    "type": "paragraph"
+                },
+                "407c0a7b-5759-461c-a082-59c52f670bf5": {
+                    "has_children": false,
+                    "paragraph": {
+                        "color": "default",
+                        "text": [
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": "https://www.notion.so/8d16c7abf8a74c7a8fee597edc05cafa",
+                                "mention": {
+                                    "page": {
+                                        "id": "8d16c7ab-f8a7-4c7a-8fee-597edc05cafa"
+                                    },
+                                    "type": "page"
+                                },
+                                "plain_text": "Capitalist Manifesto",
+                                "type": "mention"
+                            },
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": null,
+                                "plain_text": " is a good book to read on this subject, as well as ",
+                                "text": {
+                                    "content": " is a good book to read on this subject, as well as ",
+                                    "link": null
+                                },
+                                "type": "text"
+                            },
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": "https://www.notion.so/3cdb2c5ad41e4a8d8321d36cf14947a9",
+                                "mention": {
+                                    "page": {
+                                        "id": "3cdb2c5a-d41e-4a8d-8321-d36cf14947a9"
+                                    },
+                                    "type": "page"
+                                },
+                                "plain_text": "Karl Marx",
+                                "type": "mention"
+                            },
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": null,
+                                "plain_text": "  since they are opposed to each other, especially now. One more is ",
+                                "text": {
+                                    "content": "  since they are opposed to each other, especially now. One more is ",
+                                    "link": null
+                                },
+                                "type": "text"
+                            },
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": "https://www.notion.so/18c9042fe0b743c8943769c8b668720c",
+                                "mention": {
+                                    "page": {
+                                        "id": "18c9042f-e0b7-43c8-9437-69c8b668720c"
+                                    },
+                                    "type": "page"
+                                },
+                                "plain_text": "venture capital",
+                                "type": "mention"
+                            },
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": null,
+                                "plain_text": " ",
+                                "text": {
+                                    "content": " ",
+                                    "link": null
+                                },
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    "type": "paragraph"
+                },
+                "7ea896f8-6b29-4928-9883-e82625417bf4": {
+                    "has_children": false,
+                    "paragraph": {
+                        "color": "default",
+                        "text": []
+                    },
+                    "type": "paragraph"
+                },
+                "832edff3-8520-49ee-925f-17f5c5c7175e": {
+                    "has_children": false,
+                    "paragraph": {
+                        "color": "default",
+                        "text": [
+                            {
+                                "annotations": {
+                                    "bold": false,
+                                    "code": false,
+                                    "color": "default",
+                                    "italic": false,
+                                    "strikethrough": false,
+                                    "underline": false
+                                },
+                                "href": null,
+                                "plain_text": "another one ",
+                                "text": {
+                                    "content": "another one ",
+                                    "link": null
+                                },
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    "type": "paragraph"
+                }
+            },
+            "has_more": false,
+            "next_cursor": null
+        }
     """
     # (TODO: need to handle pagination via `page_size`: see https://developers.notion.com/reference/intro#pagination)
     url = f'{NOTION_API_PREFIX}/blocks/{block_id}/children'
@@ -267,10 +437,6 @@ def fetch_block_children(block_id, page_name):
 
     if len(block_children["blocks"]) == 0:
         print(f'No children found for block: ID: {block_id} Page Name: {page_name}')
-
-
-    # print("BLOCK CHILDREN:")
-    # print(json.dumps(block_children, indent=4, sort_keys=True))
 
     return block_children
 
