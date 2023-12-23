@@ -1,4 +1,5 @@
 .env
 TODO
 output.json
-**/__pycache__/
+cursor_metadata.json
+__pycache__

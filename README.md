@@ -36,9 +36,11 @@ vertex until each vertex has been covered.
 - [x] try to add a backlink to an existing page, and see if it correctly updates
       the backlink
 
-- [ ] handle pagination of the page search results
+- [x] handle pagination of the page search results
 
 - [ ] handle blocks with children by recursing on the children, see:
       https://developers.notion.com/docs/working-with-page-content#reading-nested-blocks
+
+- [ ] handle non-200 responses
 
 - [ ] go back through and add mypy types

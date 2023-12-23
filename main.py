@@ -10,6 +10,7 @@ load_dotenv()
 NOTION_KEY = os.environ.get("NOTION_KEY")
 NOTION_VERSION = "2021-08-16"
 NOTION_API_PREFIX = "https://api.notion.com/v1"
+CURSOR_METADATA_FILENAME = "cursor_metadata.json"
 
 headers = {
     "Authorization": f"Bearer {NOTION_KEY}",
@@ -99,12 +100,21 @@ def search_for_pages(search_query=None):
         }
     """
 
-    # TODO: handle pagination
+    # this is the cursor that will be used to fetch the next page of results
+    next_cursor = None
+    # we store the cursor data in case the script fails partway
+    # and we need to start from where we left off
+    if os.path.isfile(CURSOR_METADATA_FILENAME):
+        with open(CURSOR_METADATA_FILENAME) as f:
+            cursor_metadata = json.load(f)
+            next_cursor = cursor_metadata["next_cursor"]
 
     search_params = {
         "filter": {"value": "page", "property": "object"},
         "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
     }
+    if next_cursor:
+        search_params["start_cursor"] = next_cursor
 
     if search_query:
         # if you don't provide a query, then it will search all pages
@@ -470,38 +480,56 @@ def fetch_block_children(block_id, page_name):
                 "type": block["type"],
                 "paragraph": block["paragraph"],
             }
-        else:
-            print(f'Skipping non-paragraph block: {block["id"]}')
-
-    if len(block_children["blocks"]) == 0:
-        print(f"No children found for block: ID: {block_id} Page Name: {page_name}")
-
     return block_children
 
 
+def get_page_name_and_id(page):
+    """
+    Helper function to extract the page name and ID from a page object.
+    """
+    title_data = page["properties"]["title"]["title"]
+    assert len(title_data) == 1, (
+        f"only one title allowed per page, but found {len(title_data)}"
+        f"for page:\n{title_data[0]['plain_text']}"
+    )
+    page_name = title_data[0]["plain_text"]
+    assert page_name == title_data[0]["text"]["content"], (
+        f"title data is not consistent: "
+        f"{page_name}, {title_data[0]['text']['content']}"
+    )
+    page_id = page["id"]
+    print(f"Page Name: {page_name}")
+    print(f"Page ID: {page_id}")
+    return page_name, page_id
+
+
 if __name__ == "__main__":
-    # get paginated pages of metadata (TODO: handle pagination),
-    # in particular the page ID's
-    output = search_for_pages()
+    """
+    Iterate through all of my Notion pages and their first-layer children, updating
+    the page's Blocks to use mentions where now there are literal [[...]] markers
+    leftover from the Roam Research migration
+    """
 
-    for page in output["results"]:
-        # get an arbitrary page and print out useful info
-        title_data = page["properties"]["title"]["title"]
-        assert len(title_data) == 1, (
-            f"only one title allowed per page, but found {len(title_data)}"
-            f"for page:\n{title_data[0]['plain_text']}"
-        )
-        page_name = title_data[0]["plain_text"]
-        assert page_name == title_data[0]["text"]["content"], (
-            f"title data is not consistent: "
-            f"{page_name}, {title_data[0]['text']['content']}"
-        )
-        page_id = page["id"]
-        print(f"Page Name: {page_name}")
-        print(f"Page ID: {page_id}")
+    has_more = True  # starts off True, but will get updated using Notion response data
+    while has_more:
+        # get paginated pages of metadata,
+        # specifically the particular the page ID's
+        output = search_for_pages()
 
-        # process the first-layer children on that page
-        # (TODO: recurse through block sub-children to get all data)
-        block_children = fetch_block_children(page_id, page_name)
-        for block_id, block in block_children["blocks"].items():
-            response = update_a_block(block_id, block)
+        for page in output["results"]:
+            page_name, page_id = get_page_name_and_id(page)
+
+            # process the first-layer children on that page
+            # (TODO: recurse through block sub-children to get all data)
+            block_children = fetch_block_children(page_id, page_name)
+            for block_id, block in block_children["blocks"].items():
+                response = update_a_block(block_id, block)
+
+        if output["has_more"]:
+            # save the cursor data in case the script fails partway
+            # and we need to resume from where we left off
+            with open(CURSOR_METADATA_FILENAME, "w") as f:
+                cursor_data = {"next_cursor": output["next_cursor"]}
+                json.dump(cursor_data, f)
+
+        has_more = output["has_more"]
