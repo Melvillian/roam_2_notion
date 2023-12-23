@@ -36,54 +36,63 @@ def search_for_pages(search_query=None):
         search_query (str): optional page name to search for in the Notion workspace (Example: "liberalism")
 
     Returns:
-        dict: a dictionary of page data, which looks like:
+        dict: a dictionary of search result data, which includes cursor fields as well as a `results` list
         {
-            "archived": false,
-            "cover": null,
-            "created_by": {
-                "id": "5be127e8-c6d7-4a7b-a46d-a0eb3bc9d6af",
-                "object": "user"
-            },
-            "created_time": "2023-05-02T11:47:00.000Z",
-            "icon": null,
-            "id": "80b278d3-695b-43e7-bd05-e50a5d90dfdc",
-            "last_edited_by": {
-                "id": "5be127e8-c6d7-4a7b-a46d-a0eb3bc9d6af",
-                "object": "user"
-            },
-            "last_edited_time": "2023-12-19T11:03:00.000Z",
-            "object": "page",
-            "parent": {
-                "page_id": "7b1b3b0c-14cb-45a6-a4b6-d2b48faecccb",
-                "type": "page_id"
-            },
-            "properties": {
-                "title": {
-                    "id": "title",
-                    "title": [
-                        {
-                            "annotations": {
-                                "bold": false,
-                                "code": false,
-                                "color": "default",
-                                "italic": false,
-                                "strikethrough": false,
-                                "underline": false
-                            },
-                            "href": null,
-                            "plain_text": "liberalism",
-                            "text": {
-                                "content": "liberalism",
-                                "link": null
-                            },
-                            "type": "text"
+            "object": "list",
+            "results": [
+                {
+                    "object": "page",
+                    "id": "afb8dbd2-1d10-43da-bc15-87d6f6c682aa",
+                    "created_time": "2023-06-22T12:40:00.000Z",
+                    "last_edited_time": "2023-12-20T20:39:00.000Z",
+                    "created_by": {
+                        "object": "user",
+                        "id": "5be127e8-c6d7-4a7b-a46d-a0eb3bc9d6af"
+                    },
+                    "last_edited_by": {
+                        "object": "user",
+                        "id": "5be127e8-c6d7-4a7b-a46d-a0eb3bc9d6af"
+                    },
+                    "cover": null,
+                    "icon": null,
+                    "parent": {
+                        "type": "page_id",
+                        "page_id": "7b1b3b0c-14cb-45a6-a4b6-d2b48faecccb"
+                    },
+                    "archived": false,
+                    "properties": {
+                        "title": {
+                            "id": "title",
+                            "type": "title",
+                            "title": [
+                                {
+                                    "type": "text",
+                                    "text": {
+                                        "content": "cyberwizard",
+                                        "link": null
+                                    },
+                                    "annotations": {
+                                        "bold": false,
+                                        "italic": false,
+                                        "strikethrough": false,
+                                        "underline": false,
+                                        "code": false,
+                                        "color": "default"
+                                    },
+                                    "plain_text": "cyberwizard",
+                                    "href": null
+                                }
+                            ]
                         }
-                    ],
-                    "type": "title"
-                }
-            },
-            "public_url": null,
-            "url": "https://www.notion.so/liberalism-80b278d3695b43e7bd05e50a5d90dfdc"
+                    },
+                    "url": "https://www.notion.so/cyberwizard-afb8dbd21d1043dabc1587d6f6c682aa",
+                    "public_url": null
+                },
+                ...
+            ],
+            "next_cursor": "3ad0febc-4d86-4fda-882d-ee902cf66fb8",
+            "has_more": true,
+            "request_id": "a20cf866-9d69-45cf-a62a-f88d9159d7ad"
         }
     """
 
@@ -94,11 +103,13 @@ def search_for_pages(search_query=None):
             "property": "object"
         },
         "sort": {
-            "direction": "descending",
+            "direction": "ascending",
             "timestamp": "last_edited_time"
         }
     }
+
     if search_query:
+        # if you don't provide a query, then it will search all pages connected to the Notion integration
         search_params["query"] = search_query
 
     search_response = requests.post(
@@ -446,15 +457,18 @@ if __name__ == "__main__":
     # in particular the page ID's
     output = search_for_pages()
 
-    # get an arbitrary page and print out useful info
-    page_name = output["results"][0]["properties"]["title"]["title"][0]["plain_text"]
-    page_id = output["results"][0]["id"]
-    print(f"Page Name: {page_name}")
-    print(f"Page ID: {page_id}")
+    for page in output["results"]:
 
-    # print out the first-layer children on that page (TODO: recurse through block sub-children to get all data)
-    block_children = fetch_block_children(page_id, page_name)
-    for block_id, block in block_children["blocks"].items():
-        response = update_a_block(block_id, block)
-        print("UPDATE RESPONSE:")
-        print(json.dumps(response, indent=4, sort_keys=True))
+        # get an arbitrary page and print out useful info
+        title_data = page["properties"]["title"]["title"]
+        assert len(title_data) == 1, f"only one title allowed per page, but found {len(title_data)} for page:\n{page_name}"
+        page_name = title_data[0]["plain_text"]
+        assert page_name == title_data[0]["text"]["content"], f"title data is not consistent: {page_name}, {title_data[0]['text']['content']}"
+        page_id = page["id"]
+        print(f"Page Name: {page_name}")
+        print(f"Page ID: {page_id}")
+
+        # process the first-layer children on that page (TODO: recurse through block sub-children to get all data)
+        block_children = fetch_block_children(page_id, page_name)
+        for block_id, block in block_children["blocks"].items():
+            response = update_a_block(block_id, block)
