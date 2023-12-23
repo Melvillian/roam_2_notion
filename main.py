@@ -108,6 +108,7 @@ def search_for_pages(search_query=None):
         with open(CURSOR_METADATA_FILENAME) as f:
             cursor_metadata = json.load(f)
             next_cursor = cursor_metadata["next_cursor"]
+    print(f"next_cursor: {next_cursor}")
 
     search_params = {
         "filter": {"value": "page", "property": "object"},
