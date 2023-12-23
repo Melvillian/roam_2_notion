@@ -1,3 +1,4 @@
 .env
 TODO
 output.json
+**/__pycache__/

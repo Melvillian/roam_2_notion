@@ -1,9 +1,9 @@
-import requests
 import os
 import json
 import sys
 from dotenv import load_dotenv
 from lib.virtual_text import create_virtual_text
+from lib.request_rate_limiter import get, post, patch
 
 load_dotenv()
 
@@ -21,7 +21,7 @@ headers = {
 
 def fetch_page(page_id):
     url = f"{NOTION_API_PREFIX}/pages/{page_id}"
-    response = requests.get(url, headers=headers)
+    response = get(url, headers=headers)
     page_data = response.json()
     return page_data
 
@@ -111,7 +111,7 @@ def search_for_pages(search_query=None):
         # connected to the Notion integration
         search_params["query"] = search_query
 
-    search_response = requests.post(
+    search_response = post(
         f"{NOTION_API_PREFIX}/search", json=search_params, headers=headers
     )
 
@@ -264,7 +264,7 @@ def update_a_block(block_id, block):
 
     if proceed == "y":
         print("you proceeded")
-        response = requests.patch(url, headers=headers, json=new_paragraph_block)
+        response = patch(url, headers=headers, json=new_paragraph_block)
         return response.json()
 
     return None
@@ -452,7 +452,7 @@ def fetch_block_children(block_id, page_name):
     # (TODO: need to handle pagination via `page_size`: see
     # https://developers.notion.com/reference/intro#pagination)
     url = f"{NOTION_API_PREFIX}/blocks/{block_id}/children"
-    response = requests.get(url, headers=headers)
+    response = get(url, headers=headers)
     response = response.json()
 
     block_children = {
