@@ -192,7 +192,71 @@ def create_text_section(section_text):
 
 def update_a_block(block_id, block):
     """
-    TODO
+    Update a block in Notion so that all literal [[...]] are replaced with
+    mentions.
+
+    Replaces block data that looks like this:
+
+    ```json
+    {
+        "annotations": {
+            "bold": false,
+            "code": false,
+            "color": "default",
+            "italic": false,
+            "strikethrough": false,
+            "underline": false
+        },
+        "href": null,
+        "plain_text": "[[Capital Manifesto]] is a good book to read on this subject, as well as ",
+        "text": {
+            "content": "[[Capital Manifesto]] is a good book to read on this subject, as well as ",
+            "link": null
+        },
+        "type": "text"
+    },
+    ```
+
+    with this, where the [[...]] has been removed and replaced with a mention section:
+
+    ```json
+    {
+        "annotations": {
+            "bold": false,
+            "code": false,
+            "color": "default",
+            "italic": false,
+            "strikethrough": false,
+            "underline": false
+        },
+        "href": "https://www.notion.so/8d16c7abf8a74c7a8fee597edc05cafa",
+        "mention": {
+            "page": {
+                "id": "8d16c7ab-f8a7-4c7a-8fee-597edc05cafa"
+            },
+            "type": "page"
+        },
+        "plain_text": "Capitalist Manifesto",
+        "type": "mention"
+    },
+    {
+        "annotations": {
+            "bold": false,
+            "code": false,
+            "color": "default",
+            "italic": false,
+            "strikethrough": false,
+            "underline": false
+        },
+        "href": null,
+        "plain_text": " is a good book to read on this subject, as well as ",
+        "text": {
+            "content": " is a good book to read on this subject, as well as ",
+            "link": null
+        },
+        "type": "text"
+    }
+    ```
     """
 
     # this is the object we'll write to the Notion API to update the block
@@ -281,11 +345,10 @@ def update_a_block(block_id, block):
     return None
 
 
-def fetch_block_children(block_id, page_name):
+def fetch_block_children(page_id):
     """
-    Given a Block ID (which might also be a Page ID), return a dict keyed by
-    all of the given block's childrens' IDs, and the child's data, THOUGH IT
-    WILL ONLY RETURN CHILDREN THAT ARE PARAGRAPHS.
+    Given a Page ID , return a dict keyed by
+    all of the given page's block childrens' IDs, and the child's data
 
     The important value will be the `paragraph` field, which contains an
     array of objects of type `text` and `mention` (there could also be equation
@@ -294,193 +357,195 @@ def fetch_block_children(block_id, page_name):
     Returns:
         dict: a dict keyed by block ID, and the value is a dict containing the
         block's type. For example:
+        ```json
         {
-            "blocks": {
-                "13b5fa46-4308-4e19-a22b-67d440a017b6": {
-                    "has_children": false,
-                    "paragraph": {
-                        "color": "default",
-                        "text": []
-                    },
-                    "type": "paragraph"
+            "13b5fa46-4308-4e19-a22b-67d440a017b6": {
+                "has_children": false,
+                "paragraph": {
+                    "color": "default",
+                    "text": []
                 },
-                "407c0a7b-5759-461c-a082-59c52f670bf5": {
-                    "has_children": false,
-                    "paragraph": {
-                        "color": "default",
-                        "text": [
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": "https://www.notion.so/8d16c7abf8a74c7a8fee597edc05cafa",
-                                "mention": {
-                                    "page": {
-                                        "id": "8d16c7ab-f8a7-4c7a-8fee-597edc05cafa"
-                                    },
-                                    "type": "page"
-                                },
-                                "plain_text": "Capitalist Manifesto",
-                                "type": "mention"
-                            },
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": null,
-                                "plain_text": " is a good book to read on this subject, as well as ",
-                                "text": {
-                                    "content": " is a good book to read on this subject, as well as ",
-                                    "link": null
-                                },
-                                "type": "text"
-                            },
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": "https://www.notion.so/3cdb2c5ad41e4a8d8321d36cf14947a9",
-                                "mention": {
-                                    "page": {
-                                        "id": "3cdb2c5a-d41e-4a8d-8321-d36cf14947a9"
-                                    },
-                                    "type": "page"
-                                },
-                                "plain_text": "Karl Marx",
-                                "type": "mention"
-                            },
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": null,
-                                "plain_text": "  since they are opposed to each other, especially now. One more is ",
-                                "text": {
-                                    "content": "  since they are opposed to each other, especially now. One more is ",
-                                    "link": null
-                                },
-                                "type": "text"
-                            },
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": "https://www.notion.so/18c9042fe0b743c8943769c8b668720c",
-                                "mention": {
-                                    "page": {
-                                        "id": "18c9042f-e0b7-43c8-9437-69c8b668720c"
-                                    },
-                                    "type": "page"
-                                },
-                                "plain_text": "venture capital",
-                                "type": "mention"
-                            },
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": null,
-                                "plain_text": " ",
-                                "text": {
-                                    "content": " ",
-                                    "link": null
-                                },
-                                "type": "text"
-                            }
-                        ]
-                    },
-                    "type": "paragraph"
-                },
-                "7ea896f8-6b29-4928-9883-e82625417bf4": {
-                    "has_children": false,
-                    "paragraph": {
-                        "color": "default",
-                        "text": []
-                    },
-                    "type": "paragraph"
-                },
-                "832edff3-8520-49ee-925f-17f5c5c7175e": {
-                    "has_children": false,
-                    "paragraph": {
-                        "color": "default",
-                        "text": [
-                            {
-                                "annotations": {
-                                    "bold": false,
-                                    "code": false,
-                                    "color": "default",
-                                    "italic": false,
-                                    "strikethrough": false,
-                                    "underline": false
-                                },
-                                "href": null,
-                                "plain_text": "another one ",
-                                "text": {
-                                    "content": "another one ",
-                                    "link": null
-                                },
-                                "type": "text"
-                            }
-                        ]
-                    },
-                    "type": "paragraph"
-                }
+                "type": "paragraph"
             },
-            "has_more": false,
-            "next_cursor": null
-        }
-    """
-    # (TODO: need to handle pagination via `page_size`: see
-    # https://developers.notion.com/reference/intro#pagination)
-    url = f"{NOTION_API_PREFIX}/blocks/{block_id}/children"
-    response = get(url, headers=headers)
-    response = response.json()
-
-    block_children = {
-        "has_more": response["has_more"],
-        "next_cursor": response["next_cursor"],
-        "blocks": {},
-    }
-
-    for block in response["results"]:
-        # (TODO: handle non-paragraph types, like: bulleted-list,
-        # headings (for their blockren), numbered list item)
-        if block["type"] == "paragraph":
-            block_children["blocks"][block["id"]] = {
-                "has_children": block["has_children"],
-                "type": block["type"],
-                "paragraph": block["paragraph"],
+            "407c0a7b-5759-461c-a082-59c52f670bf5": {
+                "has_children": false,
+                "paragraph": {
+                    "color": "default",
+                    "text": [
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": "https://www.notion.so/8d16c7abf8a74c7a8fee597edc05cafa",
+                            "mention": {
+                                "page": {
+                                    "id": "8d16c7ab-f8a7-4c7a-8fee-597edc05cafa"
+                                },
+                                "type": "page"
+                            },
+                            "plain_text": "Capitalist Manifesto",
+                            "type": "mention"
+                        },
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": null,
+                            "plain_text": " is a good book to read on this subject, as well as ",
+                            "text": {
+                                "content": " is a good book to read on this subject, as well as ",
+                                "link": null
+                            },
+                            "type": "text"
+                        },
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": "https://www.notion.so/3cdb2c5ad41e4a8d8321d36cf14947a9",
+                            "mention": {
+                                "page": {
+                                    "id": "3cdb2c5a-d41e-4a8d-8321-d36cf14947a9"
+                                },
+                                "type": "page"
+                            },
+                            "plain_text": "Karl Marx",
+                            "type": "mention"
+                        },
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": null,
+                            "plain_text": "  since they are opposed to each other, especially now. One more is ",
+                            "text": {
+                                "content": "  since they are opposed to each other, especially now. One more is ",
+                                "link": null
+                            },
+                            "type": "text"
+                        },
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": "https://www.notion.so/18c9042fe0b743c8943769c8b668720c",
+                            "mention": {
+                                "page": {
+                                    "id": "18c9042f-e0b7-43c8-9437-69c8b668720c"
+                                },
+                                "type": "page"
+                            },
+                            "plain_text": "venture capital",
+                            "type": "mention"
+                        },
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": null,
+                            "plain_text": " ",
+                            "text": {
+                                "content": " ",
+                                "link": null
+                            },
+                            "type": "text"
+                        }
+                    ]
+                },
+                "type": "paragraph"
+            },
+            "7ea896f8-6b29-4928-9883-e82625417bf4": {
+                "has_children": false,
+                "paragraph": {
+                    "color": "default",
+                    "text": []
+                },
+                "type": "paragraph"
+            },
+            "832edff3-8520-49ee-925f-17f5c5c7175e": {
+                "has_children": false,
+                "paragraph": {
+                    "color": "default",
+                    "text": [
+                        {
+                            "annotations": {
+                                "bold": false,
+                                "code": false,
+                                "color": "default",
+                                "italic": false,
+                                "strikethrough": false,
+                                "underline": false
+                            },
+                            "href": null,
+                            "plain_text": "another one ",
+                            "text": {
+                                "content": "another one ",
+                                "link": null
+                            },
+                            "type": "text"
+                        }
+                    ]
+                },
+                "type": "paragraph"
             }
+        }
+        ```
+    """
+
+    has_more = True
+    next_cursor = None
+    block_children = {}
+    while has_more:
+        url = f"{NOTION_API_PREFIX}/blocks/{page_id}/children"
+        if next_cursor:
+            print(f"using block pagination start_cursor: {next_cursor}")
+            url += f"?start_cursor={next_cursor}"
+        response = get(url, headers=headers)
+        response = response.json()
+
+        for block in response["results"]:
+            # (TODO: handle non-paragraph types, like: bulleted-list,
+            # headings (for their block children), numbered list item)
+            if block["type"] == "paragraph":
+                block_children[block["id"]] = {
+                    "has_children": block["has_children"],
+                    "type": block["type"],
+                    "paragraph": block["paragraph"],
+                }
+
+        has_more = response["has_more"]
+        next_cursor = response["next_cursor"]
+
     return block_children
 
 
@@ -522,8 +587,8 @@ if __name__ == "__main__":
 
             # process the first-layer children on that page
             # (TODO: recurse through block sub-children to get all data)
-            block_children = fetch_block_children(page_id, page_name)
-            for block_id, block in block_children["blocks"].items():
+            block_children = fetch_block_children(page_id)
+            for block_id, block in block_children.items():
                 response = update_a_block(block_id, block)
 
         if output["has_more"]:

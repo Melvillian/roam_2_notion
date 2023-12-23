@@ -41,6 +41,8 @@ vertex until each vertex has been covered.
 - [ ] handle blocks with children by recursing on the children, see:
       https://developers.notion.com/docs/working-with-page-content#reading-nested-blocks
 
+- [ ] handle non-paragraph blocks
+
 - [ ] handle non-200 responses
 
 - [ ] go back through and add mypy types

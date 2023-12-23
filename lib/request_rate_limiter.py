@@ -25,7 +25,6 @@ def rate_limit(func):
         now = time.time()
         if now - time_of_last_response < REQUEST_INTERVAL_SECS:
             time.sleep(REQUEST_INTERVAL_SECS - (now - time_of_last_response))
-        time_of_last_response = time.time()
         result = func(*args, **kwargs)
         time_of_last_response = time.time()
         return result
