@@ -45,4 +45,9 @@ vertex until each vertex has been covered.
 
 - [ ] handle non-200 responses
 
+- [ ] add a pyproject file, like described here
+      https://packaging.python.org/en/latest/guides/writing-pyproject-toml/ and
+      for example here:
+      https://github.com/asweigart/pyscreeze/blob/master/pyproject.toml
+
 - [ ] go back through and add mypy types

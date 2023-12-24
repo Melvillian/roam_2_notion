@@ -37,7 +37,7 @@ def search_for_pages(search_query=None):
     which can be used to access each page's content using the block API
 
     Args:
-        search_query (str): page name to search for, for search all if None
+        search_query (str): Page name to search for. If None, for search all Pages
 
     Returns:
         dict: a dictionary of search results and cursor data
@@ -100,27 +100,28 @@ def search_for_pages(search_query=None):
         }
     """
 
-    # this is the cursor that will be used to fetch the next page of results
-    next_cursor = None
-    # we store the cursor data in case the script fails partway
-    # and we need to start from where we left off
-    if os.path.isfile(CURSOR_METADATA_FILENAME):
-        with open(CURSOR_METADATA_FILENAME) as f:
-            cursor_metadata = json.load(f)
-            next_cursor = cursor_metadata["next_cursor"]
-    print(f"next_cursor: {next_cursor}")
-
     search_params = {
         "filter": {"value": "page", "property": "object"},
         "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
     }
-    if next_cursor:
-        search_params["start_cursor"] = next_cursor
 
     if search_query:
         # if you don't provide a query, then it will search all pages
         # connected to the Notion integration
         search_params["query"] = search_query
+    else:
+        # we must be searching through all the pages, so this is the cursor
+        # that will be used to fetch the next page of results
+        next_cursor = None
+        # we store the cursor data in a file in case the script fails partway
+        # and we need to start from where we left off
+        if os.path.isfile(CURSOR_METADATA_FILENAME):
+            with open(CURSOR_METADATA_FILENAME) as f:
+                cursor_metadata = json.load(f)
+                next_cursor = cursor_metadata["next_cursor"]
+        if next_cursor:
+            print(f"next_cursor: {next_cursor}")
+            search_params["start_cursor"] = next_cursor
 
     search_response = post(
         f"{NOTION_API_PREFIX}/search", json=search_params, headers=headers
@@ -129,7 +130,7 @@ def search_for_pages(search_query=None):
     return search_response.json()
 
 
-def create_mention_section(mention_page_name):
+def generate_mention_section(mention_page_name):
     """
     Create a mention section for the paragraph block.
 
@@ -137,15 +138,30 @@ def create_mention_section(mention_page_name):
     for a paragraph
     """
 
+    print(f"Creating mention section for {mention_page_name}")
+
     response = search_for_pages(mention_page_name)
 
     results = response["results"]
-    assert len(results) == 1, (
-        f"There should only be one page with this name {mention_page_name},"
-        f"but instead we found the results: {json.dumps(results, indent=4, sort_keys=True)}"
+    # sometimes there exist page names that are substrings of other page
+    # names, for instance when searching "HackerDAO" brings up 2 pages:
+    # 'HackerDAO' and 'HackerDAO TODO'. In all these cases we know we
+    # want the page with the exact name match `HackerDAO`, so we'll filter
+    # down to just that one page
+    matched_results = list(
+        filter(
+            lambda result: result["properties"]["title"]["title"][0]["plain_text"]
+            == mention_page_name,
+            response["results"],
+        )
     )
-    page_id = results[0]["id"]
-    href = results[0]["url"]
+    assert len(matched_results) == 1, (
+        f"There should only be one page with this name {mention_page_name}, "
+        f"but instead we found the results: "
+        f"{json.dumps(results, indent=4, sort_keys=True)}"
+    )
+    page_id = matched_results[0]["id"]
+    href = matched_results[0]["url"]
 
     new_section = {
         "annotations": {
@@ -165,7 +181,7 @@ def create_mention_section(mention_page_name):
     return new_section
 
 
-def create_text_section(section_text):
+def generate_text_section(section_text):
     """
     Create a text section for the paragraph block.
 
@@ -190,9 +206,10 @@ def create_text_section(section_text):
     return new_section
 
 
-def update_a_block(block_id, block):
+def check_for_and_update_block(block_id, block):
     """
-    Update a block in Notion so that all literal [[...]] are replaced with
+    Check if a block contains any [[...]] literals, and if so,
+    update the block in Notion so that all literal [[...]] are replaced with
     mentions.
 
     Replaces block data that looks like this:
@@ -217,7 +234,8 @@ def update_a_block(block_id, block):
     },
     ```
 
-    with this, where the [[...]] has been removed and replaced with a mention section:
+    with this, where the [[...]] has been removed and replaced with a mention
+    section:
 
     ```json
     {
@@ -300,9 +318,9 @@ def update_a_block(block_id, block):
                 section_text = section[0]
                 is_mention = section[1]
                 new_section = (
-                    create_mention_section(section_text)
+                    generate_mention_section(section_text)
                     if is_mention
-                    else create_text_section(section_text)
+                    else generate_text_section(section_text)
                 )
                 new_paragraph.append(new_section)
 
@@ -542,6 +560,10 @@ def fetch_block_children(page_id):
                     "type": block["type"],
                     "paragraph": block["paragraph"],
                 }
+            else:
+                print(json.dumps(response, indent=4, sort_keys=True))
+                print("NON PARAGRAPH BLOCK DEBUG")
+                sys.exit(0)
 
         has_more = response["has_more"]
         next_cursor = response["next_cursor"]
@@ -549,7 +571,7 @@ def fetch_block_children(page_id):
     return block_children
 
 
-def get_page_name_and_id(page):
+def extract_page_name_and_id(page):
     """
     Helper function to extract the page name and ID from a page object.
     """
@@ -564,38 +586,38 @@ def get_page_name_and_id(page):
         f"{page_name}, {title_data[0]['text']['content']}"
     )
     page_id = page["id"]
-    print(f"Page Name: {page_name}")
-    print(f"Page ID: {page_id}")
     return page_name, page_id
 
 
 if __name__ == "__main__":
     """
-    Iterate through all of my Notion pages and their first-layer children, updating
-    the page's Blocks to use mentions where now there are literal [[...]] markers
-    leftover from the Roam Research migration
+    Iterate through all of my Notion pages and their first-layer children,
+    updating the page's Blocks to use mentions where now there are literal
+    [[...]] markers leftover from the Roam Research migration
     """
 
-    has_more = True  # starts off True, but will get updated using Notion response data
-    while has_more:
+    has_more_pages = True
+    while has_more_pages:
         # get paginated pages of metadata,
         # specifically the particular the page ID's
-        output = search_for_pages()
+        response = search_for_pages()
 
-        for page in output["results"]:
-            page_name, page_id = get_page_name_and_id(page)
+        for page in response["results"]:
+            page_name, page_id = extract_page_name_and_id(page)
+            print(f"Page Name: {page_name}")
+            print(f"Page ID: {page_id}")
 
             # process the first-layer children on that page
             # (TODO: recurse through block sub-children to get all data)
             block_children = fetch_block_children(page_id)
             for block_id, block in block_children.items():
-                response = update_a_block(block_id, block)
+                response = check_for_and_update_block(block_id, block)
 
-        if output["has_more"]:
+        if response["has_more"]:
             # save the cursor data in case the script fails partway
             # and we need to resume from where we left off
             with open(CURSOR_METADATA_FILENAME, "w") as f:
-                cursor_data = {"next_cursor": output["next_cursor"]}
+                cursor_data = {"next_cursor": response["next_cursor"]}
                 json.dump(cursor_data, f)
 
-        has_more = output["has_more"]
+        has_more_pages = response["has_more"]
