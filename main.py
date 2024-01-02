@@ -362,7 +362,7 @@ def check_for_and_update_block(block_id, block):
 
     if proceed == "y":
         url = f"{NOTION_API_PREFIX}/blocks/{block_id}"
-        response = patch(url, headers=HEADERS, json=new_paragraph_block)
+        patch(url, headers=HEADERS, json=new_paragraph_block)
 
 
 def fetch_block_children(page_id):
@@ -558,18 +558,25 @@ def fetch_block_children(page_id):
         for block in response["results"]:
             # (TODO: handle non-paragraph types, like: bulleted-list,
             # headings (for their block children), numbered list item)
-            if block["type"] == "paragraph":
-                block_children[block["id"]] = {
-                    "has_children": block["has_children"],
-                    "type": block["type"],
-                    "paragraph": block["paragraph"],
-                }
-            else:
-                debug_print(
-                    "NON PARAGRAPH BLOCK",
-                    json.dumps(response, indent=4, sort_keys=True),
-                )
-                sys.exit(0)
+            if block["type"] in BLOCK_TYPES_TO_PROCESS:
+                if block["type"] == "paragraph":
+                    block_children[block["id"]] = {
+                        "has_children": block["has_children"],
+                        "type": block["type"],
+                        "paragraph": block["paragraph"],
+                    }
+                elif response["has_more"]:
+                    debug_print(
+                        "NON PARAGRAPH WITH CHILDREN",
+                        json.dumps(response, indent=4, sort_keys=True),
+                    )
+                    sys.exit(0)
+                # else:
+                #     debug_print(
+                #         "NON PARAGRAPH BLOCK",
+                #         json.dumps(response, indent=4, sort_keys=True),
+                #     )
+                #     sys.exit(0)
 
         has_more = response["has_more"]
         next_cursor = response["next_cursor"]
