@@ -12,7 +12,22 @@ NOTION_VERSION = "2021-08-16"
 NOTION_API_PREFIX = "https://api.notion.com/v1"
 CURSOR_METADATA_FILENAME = "cursor_metadata.json"
 
-headers = {
+# TODO: make use of matching via something like:
+# https://stackoverflow.com/questions/16258553/how-can-i-define-algebraic-data-types-in-python
+# These are all of the Notion block types that we believe contain [[...]]
+# literals and we will want to process. You can see the full list here:
+# https://developers.notion.com/reference/block#block-type-objects
+BLOCK_TYPES_TO_PROCESS = [
+    "paragraph",
+    "bulleted_list_item",
+    "heading_1",
+    "heading_2",
+    "heading_3",
+    "numbered_list_item",
+    "toggle",
+]
+
+HEADERS = {
     "Authorization": f"Bearer {NOTION_KEY}",
     "Content-Type": "application/json",
     "Notion-Version": NOTION_VERSION,
@@ -20,11 +35,13 @@ headers = {
 # TODO: handle non-200 responses everywhere
 
 
-def fetch_page(page_id):
-    url = f"{NOTION_API_PREFIX}/pages/{page_id}"
-    response = get(url, headers=headers)
-    page_data = response.json()
-    return page_data
+def debug_print(header, message):
+    """
+    Simple helper function to print debug messages to the console, used for debugging
+
+    Should delete this before deploying to production
+    """
+    print(f"DEBUG: {header}:\n{message}")
 
 
 def search_for_pages(search_query=None):
@@ -120,11 +137,11 @@ def search_for_pages(search_query=None):
                 cursor_metadata = json.load(f)
                 next_cursor = cursor_metadata["next_cursor"]
         if next_cursor:
-            print(f"next_cursor: {next_cursor}")
+            debug_print("next_cursor", next_cursor)
             search_params["start_cursor"] = next_cursor
 
     search_response = post(
-        f"{NOTION_API_PREFIX}/search", json=search_params, headers=headers
+        f"{NOTION_API_PREFIX}/search", json=search_params, headers=HEADERS
     )
 
     return search_response.json()
@@ -277,62 +294,44 @@ def check_for_and_update_block(block_id, block):
     ```
     """
 
-    # this is the object we'll write to the Notion API to update the block
-    new_paragraph_block = {
-        "paragraph": {
-            "color": None,
-            "text": None,
-        }
-    }
+    old_paragraph = block["paragraph"]
+    if not old_paragraph["text"]:
+        # this is a boring empty paragraph, so we do not update
+        # anything and simply return
+        return
+
     # update this to True if this block contains any
     # literals [[...]] we need to turn into mentions
     needs_update = False
-    if block["type"] == "paragraph":
-        old_paragraph = block["paragraph"]
-        if not old_paragraph["text"]:
-            # this is a boring empty paragraph, so we do not update
-            # anything and simply return
-            return
 
-        # start building the new paragraph that we'll use to update
-        # (i.e. overwrite) the old paragraph block
-        new_paragraph_block["paragraph"]["color"] = old_paragraph["color"]
-        new_paragraph = []
-        for paragraph_section in old_paragraph["text"]:
-            virtual_text = create_virtual_text(paragraph_section["plain_text"])
+    # start building the new paragraph that we'll use to overwrite
+    # (i.e. overwrite) the old paragraph block
+    new_paragraph = []
+    for paragraph_section in old_paragraph["text"]:
+        virtual_text = create_virtual_text(paragraph_section["plain_text"])
 
-            if not any(tup[1] for tup in virtual_text):
-                # this section of paragraph doesn't contain any literal [[...]]
-                # text which should be turned into mentions, so we should leave
-                # it as is by simply appending the existing old section to the
-                # new paragraph's content
-                new_paragraph.append(paragraph_section)
-                continue
+        if not any(tup[1] for tup in virtual_text):
+            # this section of paragraph doesn't contain any literal [[...]]
+            # text which should be turned into mentions, so we should leave
+            # it as is by simply appending the existing old section to the
+            # new paragraph's content
+            new_paragraph.append(paragraph_section)
+            continue
 
-            needs_update = True
-            # this section of paragraph contains literal [[...]] text
-            # which should be turned into mentions so we'll need to
-            # build a new section for each mention and for each plaintext,
-            # and append it to the new paragraph
-            for section in virtual_text:
-                section_text = section[0]
-                is_mention = section[1]
-                new_section = (
-                    generate_mention_section(section_text)
-                    if is_mention
-                    else generate_text_section(section_text)
-                )
-                new_paragraph.append(new_section)
-
-        new_paragraph_block["paragraph"]["text"] = new_paragraph
-    else:
-        print(
-            f"Found a non-paragraph block of type {block['type']} in block {block_id}."
-        )
-        print("BLOCK:")
-        print(block)
-        print("Aborting update")
-        sys.exit(0)
+        needs_update = True
+        # this section of paragraph contains literal [[...]] text
+        # which should be turned into mentions so we'll need to
+        # build a new section for each mention and for each plaintext,
+        # and append it to the new paragraph
+        for section in virtual_text:
+            section_text = section[0]
+            is_mention = section[1]
+            new_section = (
+                generate_mention_section(section_text)
+                if is_mention
+                else generate_text_section(section_text)
+            )
+            new_paragraph.append(new_section)
 
     if not needs_update:
         print(
@@ -341,11 +340,17 @@ def check_for_and_update_block(block_id, block):
                 " so we'll not update it."
             )
         )
-        return None
+        return
 
-    print(json.dumps(old_paragraph, indent=4, sort_keys=True))
+    # this is the object we'll write to the Notion API to update the block
+    new_paragraph_block = {
+        "paragraph": {
+            "color": old_paragraph["color"],
+            "text": new_paragraph,
+        }
+    }
 
-    url = f"{NOTION_API_PREFIX}/blocks/{block_id}"
+    debug_print("OLD PARAGRAPH", json.dumps(old_paragraph, indent=4, sort_keys=True))
 
     proceed = input(
         (
@@ -356,11 +361,8 @@ def check_for_and_update_block(block_id, block):
     )
 
     if proceed == "y":
-        print("you proceeded")
-        response = patch(url, headers=headers, json=new_paragraph_block)
-        return response.json()
-
-    return None
+        url = f"{NOTION_API_PREFIX}/blocks/{block_id}"
+        response = patch(url, headers=HEADERS, json=new_paragraph_block)
 
 
 def fetch_block_children(page_id):
@@ -543,12 +545,14 @@ def fetch_block_children(page_id):
     has_more = True
     next_cursor = None
     block_children = {}
+    base_url = f"{NOTION_API_PREFIX}/blocks/{page_id}/children"
+
     while has_more:
-        url = f"{NOTION_API_PREFIX}/blocks/{page_id}/children"
+        url = base_url
         if next_cursor:
             print(f"using block pagination start_cursor: {next_cursor}")
             url += f"?start_cursor={next_cursor}"
-        response = get(url, headers=headers)
+        response = get(url, headers=HEADERS)
         response = response.json()
 
         for block in response["results"]:
@@ -561,8 +565,10 @@ def fetch_block_children(page_id):
                     "paragraph": block["paragraph"],
                 }
             else:
-                print(json.dumps(response, indent=4, sort_keys=True))
-                print("NON PARAGRAPH BLOCK DEBUG")
+                debug_print(
+                    "NON PARAGRAPH BLOCK",
+                    json.dumps(response, indent=4, sort_keys=True),
+                )
                 sys.exit(0)
 
         has_more = response["has_more"]
@@ -611,7 +617,7 @@ if __name__ == "__main__":
             # (TODO: recurse through block sub-children to get all data)
             block_children = fetch_block_children(page_id)
             for block_id, block in block_children.items():
-                response = check_for_and_update_block(block_id, block)
+                check_for_and_update_block(block_id, block)
 
         if response["has_more"]:
             # save the cursor data in case the script fails partway
