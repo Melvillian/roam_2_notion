@@ -36,13 +36,19 @@ HEADERS = {
 # TODO: handle non-200 responses everywhere
 
 
-def debug_print(header: str, message: str) -> None:
+def debug_print(header: str, message: str | dict[str, Any]) -> None:
     """
-    Simple helper function to print debug messages to the console, used for debugging
+    Simple helper function to print debug messages to the console
+    used for debugging
 
-    Should delete this before deploying to production
+    Should delete all uses of this before deploying to production
     """
-    print(f"DEBUG: {header}:\n{message}")
+    if isinstance(message, dict):
+        # it's a json blob, so pretty print it
+        print(f"DEBUG: {header}:\n{json.dumps(message, indent=4, sort_keys=True)}")
+    else:
+        # it's not a json blob, so just print it
+        print(f"DEBUG: {header}:\n{message}")
 
 
 def search_for_pages(search_query: Optional[str]) -> dict[str, Any]:
@@ -354,7 +360,7 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     proceed = input(
         (
             f"{json.dumps(new_content_block, indent=4, sort_keys=True)}\n"
-            "type 'y' if you wish to proceed with the above patch update to"
+            "type 'y' if you wish to proceed with the above patch update to "
             f"block id: {block_id}... (y/n)"
         )
     )
@@ -553,6 +559,7 @@ def fetch_block_children(page_id: str) -> dict[str, Any]:
             url += f"?start_cursor={next_cursor}"
         response = get(url, headers=HEADERS)
         response = response.json()
+        debug_print(response, response)
 
         for block in response["results"]:
             if block["type"] in BLOCK_TYPES_TO_PROCESS:
