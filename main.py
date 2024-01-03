@@ -149,10 +149,11 @@ def search_for_pages(search_query=None):
 
 def generate_mention_section(mention_page_name):
     """
-    Create a mention section for the paragraph block.
+    Create a mention section for the block.
 
     This is the real purpose of the script, to create these mention sections
-    for a paragraph
+    for sections of text that currently contain mentions to other pages, but
+    using the literal [[...]] syntax from Roam Research
     """
 
     print(f"Creating mention section for {mention_page_name}")
@@ -200,7 +201,7 @@ def generate_mention_section(mention_page_name):
 
 def generate_text_section(section_text):
     """
-    Create a text section for the paragraph block.
+    Create a text section for the block.
 
     This is pretty boring, because it just contains simple plaintext,
     no mentions
@@ -294,9 +295,9 @@ def check_for_and_update_block(block_id, block):
     ```
     """
 
-    old_paragraph = block["paragraph"]
-    if not old_paragraph["text"]:
-        # this is a boring empty paragraph, so we do not update
+    old_content = block["content"]
+    if not old_content["text"]:
+        # this is a boring empty block, so we do not update
         # anything and simply return
         return
 
@@ -304,25 +305,25 @@ def check_for_and_update_block(block_id, block):
     # literals [[...]] we need to turn into mentions
     needs_update = False
 
-    # start building the new paragraph that we'll use to overwrite
-    # (i.e. overwrite) the old paragraph block
-    new_paragraph = []
-    for paragraph_section in old_paragraph["text"]:
-        virtual_text = create_virtual_text(paragraph_section["plain_text"])
+    # start building the new block content that we'll use to overwrite
+    # (i.e. overwrite) the old block contents
+    new_content = []
+    for content_section in old_content["text"]:
+        virtual_text = create_virtual_text(content_section["plain_text"])
 
         if not any(tup[1] for tup in virtual_text):
-            # this section of paragraph doesn't contain any literal [[...]]
+            # this section of the block doesn't contain any literal [[...]]
             # text which should be turned into mentions, so we should leave
             # it as is by simply appending the existing old section to the
-            # new paragraph's content
-            new_paragraph.append(paragraph_section)
+            # new block's content
+            new_content.append(content_section)
             continue
 
         needs_update = True
-        # this section of paragraph contains literal [[...]] text
+        # this section of block contains literal [[...]] text
         # which should be turned into mentions so we'll need to
         # build a new section for each mention and for each plaintext,
-        # and append it to the new paragraph
+        # and append it to the new block
         for section in virtual_text:
             section_text = section[0]
             is_mention = section[1]
@@ -331,7 +332,7 @@ def check_for_and_update_block(block_id, block):
                 if is_mention
                 else generate_text_section(section_text)
             )
-            new_paragraph.append(new_section)
+            new_content.append(new_section)
 
     if not needs_update:
         print(
@@ -343,18 +344,19 @@ def check_for_and_update_block(block_id, block):
         return
 
     # this is the object we'll write to the Notion API to update the block
-    new_paragraph_block = {
-        "paragraph": {
-            "color": old_paragraph["color"],
-            "text": new_paragraph,
+    block_type = block["type"]
+    new_content_block = {
+        block_type: {
+            "color": old_content["color"],
+            "text": new_content,
         }
     }
 
-    debug_print("OLD PARAGRAPH", json.dumps(old_paragraph, indent=4, sort_keys=True))
+    debug_print("OLD CONTENT", json.dumps(old_content, indent=4, sort_keys=True))
 
     proceed = input(
         (
-            f"{json.dumps(new_paragraph_block, indent=4, sort_keys=True)}\n"
+            f"{json.dumps(new_content_block, indent=4, sort_keys=True)}\n"
             "type 'y' if you wish to proceed with the above patch update to"
             f"block id: {block_id}... (y/n)"
         )
@@ -362,7 +364,7 @@ def check_for_and_update_block(block_id, block):
 
     if proceed == "y":
         url = f"{NOTION_API_PREFIX}/blocks/{block_id}"
-        patch(url, headers=HEADERS, json=new_paragraph_block)
+        patch(url, headers=HEADERS, json=new_content_block)
 
 
 def fetch_block_children(page_id):
@@ -370,7 +372,7 @@ def fetch_block_children(page_id):
     Given a Page ID , return a dict keyed by
     all of the given page's block childrens' IDs, and the child's data
 
-    The important value will be the `paragraph` field, which contains an
+    The important value will be the `content` field, which contains an
     array of objects of type `text` and `mention` (there could also be equation
     in the original block, but we ignore those)
 
@@ -381,7 +383,7 @@ def fetch_block_children(page_id):
         {
             "13b5fa46-4308-4e19-a22b-67d440a017b6": {
                 "has_children": false,
-                "paragraph": {
+                "content": {
                     "color": "default",
                     "text": []
                 },
@@ -389,7 +391,7 @@ def fetch_block_children(page_id):
             },
             "407c0a7b-5759-461c-a082-59c52f670bf5": {
                 "has_children": false,
-                "paragraph": {
+                "content": {
                     "color": "default",
                     "text": [
                         {
@@ -506,7 +508,7 @@ def fetch_block_children(page_id):
             },
             "7ea896f8-6b29-4928-9883-e82625417bf4": {
                 "has_children": false,
-                "paragraph": {
+                "content": {
                     "color": "default",
                     "text": []
                 },
@@ -514,7 +516,7 @@ def fetch_block_children(page_id):
             },
             "832edff3-8520-49ee-925f-17f5c5c7175e": {
                 "has_children": false,
-                "paragraph": {
+                "content": {
                     "color": "default",
                     "text": [
                         {
@@ -555,28 +557,22 @@ def fetch_block_children(page_id):
         response = get(url, headers=HEADERS)
         response = response.json()
 
+        debug_print("BLOCK RESPONSE", json.dumps(response, indent=4, sort_keys=True))
+
         for block in response["results"]:
-            # (TODO: handle non-paragraph types, like: bulleted-list,
-            # headings (for their block children), numbered list item)
             if block["type"] in BLOCK_TYPES_TO_PROCESS:
-                if block["type"] == "paragraph":
-                    block_children[block["id"]] = {
-                        "has_children": block["has_children"],
-                        "type": block["type"],
-                        "paragraph": block["paragraph"],
-                    }
-                elif response["has_more"]:
+                block_type = block["type"]
+                block_children[block["id"]] = {
+                    "has_children": block["has_children"],
+                    "type": block_type,
+                    "content": block[block_type],
+                }
+                if block["has_children"]:
                     debug_print(
                         "NON PARAGRAPH WITH CHILDREN",
                         json.dumps(response, indent=4, sort_keys=True),
                     )
                     sys.exit(0)
-                # else:
-                #     debug_print(
-                #         "NON PARAGRAPH BLOCK",
-                #         json.dumps(response, indent=4, sort_keys=True),
-                #     )
-                #     sys.exit(0)
 
         has_more = response["has_more"]
         next_cursor = response["next_cursor"]
