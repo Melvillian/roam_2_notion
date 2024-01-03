@@ -1,10 +1,9 @@
 import os
 import json
-import sys
 from dotenv import load_dotenv
 from lib.virtual_text import create_virtual_text
 from lib.request_rate_limiter import get, post, patch
-from typing import Optional, Any
+from typing import Any
 
 load_dotenv()
 
@@ -51,9 +50,56 @@ def debug_print(header: str, message: str | dict[str, Any]) -> None:
         print(f"DEBUG: {header}:\n{message}")
 
 
-def search_for_pages(search_query: Optional[str]) -> dict[str, Any]:
+def search_for_page(page_name: str) -> tuple[str, str]:
     """
-    Searches for pages in the user's Notion workspace
+    Search for page id and url that exactly matches the given page name
+
+    Based on the Notion API key you're using and the pages that have been
+    shared with the key's integration, return a tuple of the page id and url
+    that exactly matches the given page name.
+
+    Args:
+        page_name (str): Page name to search for
+
+    Returns:
+        tuple[str, str]: Tuple of the page id and url, or raise Exception if no match found
+    """
+
+    search_params: dict[str, Any] = {
+        "filter": {"value": "page", "property": "object"},
+        "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
+        "query": page_name,
+    }
+
+    has_more = True
+    next_cursor = None
+
+    # loop over the paginated Notion results, searching for an exact match
+    # so we can extract the id and url
+    while has_more:
+        if next_cursor:
+            search_params["start_cursor"] = next_cursor
+
+        search_response = post(
+            f"{NOTION_API_PREFIX}/search", json=search_params, headers=HEADERS
+        )
+
+        response = search_response.json()
+
+        for result in response["results"]:
+            if result["properties"]["title"]["title"][0]["plain_text"] == page_name:
+                return (result["id"], result["url"])
+
+        has_more = response["has_more"]
+        next_cursor = response["next_cursor"]
+
+    print(f"No page found with name {page_name}")
+    raise Exception("Aborting...")
+
+
+def search_for_pages() -> dict[str, Any]:
+    """
+    Searches for all pages in the user's Notion workspace
 
     Based on the Notion API key you're using and the pages that have been
     shared with the key's integration, return all of the pages' properties
@@ -61,7 +107,6 @@ def search_for_pages(search_query: Optional[str]) -> dict[str, Any]:
     which can be used to access each page's content using the block API
 
     Args:
-        search_query (str): Page name to search for. If None, for search all Pages
 
     Returns:
         dict: a dictionary of search results and cursor data
@@ -129,22 +174,17 @@ def search_for_pages(search_query: Optional[str]) -> dict[str, Any]:
         "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
     }
 
-    if search_query:
-        # if you don't provide a query, then it will search all pages
-        # connected to the Notion integration
-        search_params["query"] = search_query
-    else:
-        # we must be searching through all the pages, so this is the cursor
-        # that will be used to fetch the next page of results
-        next_cursor = None
-        # we store the cursor data in a file in case the script fails partway
-        # and we need to start from where we left off
-        if os.path.isfile(CURSOR_METADATA_FILENAME):
-            with open(CURSOR_METADATA_FILENAME) as f:
-                cursor_metadata = json.load(f)
-                next_cursor = cursor_metadata["next_cursor"]
-        if next_cursor:
-            search_params["start_cursor"] = next_cursor
+    # we must be searching through all the pages, so this is the cursor
+    # that will be used to fetch the next page of results
+    next_cursor = None
+    # we store the cursor data in a file in case the script fails partway
+    # and we need to start from where we left off
+    if os.path.isfile(CURSOR_METADATA_FILENAME):
+        with open(CURSOR_METADATA_FILENAME) as f:
+            cursor_metadata = json.load(f)
+            next_cursor = cursor_metadata["next_cursor"]
+    if next_cursor:
+        search_params["start_cursor"] = next_cursor
 
     search_response = post(
         f"{NOTION_API_PREFIX}/search", json=search_params, headers=HEADERS
@@ -164,29 +204,7 @@ def generate_mention_section(mention_page_name: str) -> dict[str, Any]:
 
     print(f"Creating mention section for {mention_page_name}")
 
-    response = search_for_pages(mention_page_name)
-
-    # sometimes there exist page names that are substrings of other page
-    # names, for instance when searching "HackerDAO" brings up 2 pages:
-    # 'HackerDAO' and 'HackerDAO TODO'. In all these cases we know we
-    # want the page with the exact name match `HackerDAO`, so we'll filter
-    # down to just that one page
-    results = response["results"]
-    matched_results = list(
-        filter(
-            lambda result: result["properties"]["title"]["title"][0]["plain_text"]
-            == mention_page_name,
-            results,
-        )
-    )
-    assert len(matched_results) == 1, (
-        f"There should only be one page with this name {mention_page_name}, "
-        f"but instead we found the results: "
-        f"{json.dumps(results, indent=4, sort_keys=True)}\n"
-        f"and the matched results:\n{json.dumps(matched_results, indent=4, sort_keys=True)}"
-    )
-    page_id = matched_results[0]["id"]
-    href = matched_results[0]["url"]
+    (page_id, href) = search_for_page(mention_page_name)
 
     new_section = {
         "annotations": {
@@ -316,9 +334,7 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     # (i.e. overwrite) the old block contents
     new_content = []
     for content_section in old_content["text"]:
-        debug_print("CONTENT SECTION", content_section)
         virtual_text = create_virtual_text(content_section["plain_text"])
-        debug_print("VIRTUAL TEXT", virtual_text)
 
         if not any(tup[1] for tup in virtual_text):
             # this section of the block doesn't contain any literal [[...]]
@@ -595,7 +611,7 @@ if __name__ == "__main__":
     while has_more_pages:
         # get paginated pages of metadata,
         # specifically the particular the page ID's
-        response = search_for_pages(None)
+        response = search_for_pages()
 
         for page in response["results"]:
             page_name, page_id = extract_page_name_and_id(page)
