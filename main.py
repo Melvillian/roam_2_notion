@@ -144,7 +144,6 @@ def search_for_pages(search_query: Optional[str]) -> dict[str, Any]:
                 cursor_metadata = json.load(f)
                 next_cursor = cursor_metadata["next_cursor"]
         if next_cursor:
-            debug_print("next_cursor", next_cursor)
             search_params["start_cursor"] = next_cursor
 
     search_response = post(
@@ -183,7 +182,8 @@ def generate_mention_section(mention_page_name: str) -> dict[str, Any]:
     assert len(matched_results) == 1, (
         f"There should only be one page with this name {mention_page_name}, "
         f"but instead we found the results: "
-        f"{json.dumps(results, indent=4, sort_keys=True)}"
+        f"{json.dumps(results, indent=4, sort_keys=True)}\n"
+        f"and the matched results:\n{json.dumps(matched_results, indent=4, sort_keys=True)}"
     )
     page_id = matched_results[0]["id"]
     href = matched_results[0]["url"]
@@ -316,7 +316,9 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     # (i.e. overwrite) the old block contents
     new_content = []
     for content_section in old_content["text"]:
+        debug_print("CONTENT SECTION", content_section)
         virtual_text = create_virtual_text(content_section["plain_text"])
+        debug_print("VIRTUAL TEXT", virtual_text)
 
         if not any(tup[1] for tup in virtual_text):
             # this section of the block doesn't contain any literal [[...]]
@@ -355,19 +357,8 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
         }
     }
 
-    debug_print("OLD CONTENT", json.dumps(old_content, indent=4, sort_keys=True))
-
-    proceed = input(
-        (
-            f"{json.dumps(new_content_block, indent=4, sort_keys=True)}\n"
-            "type 'y' if you wish to proceed with the above patch update to "
-            f"block id: {block_id}... (y/n)"
-        )
-    )
-
-    if proceed == "y":
-        url = f"{NOTION_API_PREFIX}/blocks/{block_id}"
-        patch(url, headers=HEADERS, json=new_content_block)
+    url = f"{NOTION_API_PREFIX}/blocks/{block_id}"
+    patch(url, headers=HEADERS, json=new_content_block)
 
 
 def fetch_block_children(page_id: str) -> dict[str, Any]:
@@ -559,7 +550,6 @@ def fetch_block_children(page_id: str) -> dict[str, Any]:
             url += f"?start_cursor={next_cursor}"
         response = get(url, headers=HEADERS)
         response = response.json()
-        debug_print(response, response)
 
         for block in response["results"]:
             if block["type"] in BLOCK_TYPES_TO_PROCESS:
