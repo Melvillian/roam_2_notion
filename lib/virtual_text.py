@@ -5,7 +5,7 @@ LEFT_BRACKET_PATTERN = r"\[\["
 RIGHT_BRACKET_PATTERN = r"\]\]"
 
 
-def create_virtual_text(text):
+def create_virtual_text(text: str) -> list[tuple[str, bool]]:
     """
     Given some Notion paragraph with square bracket mentions in it i.e.:
 

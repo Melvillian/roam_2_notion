@@ -15,6 +15,8 @@ def rate_limit(func):
 
     Waits at least 400ms between requests.
 
+    https://developers.notion.com/reference/request-limits#rate-limits
+
     """
     REQUEST_INTERVAL_SECS = 0.4
     time_of_last_response = time.time()

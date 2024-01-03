@@ -4,6 +4,7 @@ import sys
 from dotenv import load_dotenv
 from lib.virtual_text import create_virtual_text
 from lib.request_rate_limiter import get, post, patch
+from typing import Optional, Any
 
 load_dotenv()
 
@@ -35,7 +36,7 @@ HEADERS = {
 # TODO: handle non-200 responses everywhere
 
 
-def debug_print(header, message):
+def debug_print(header: str, message: str) -> None:
     """
     Simple helper function to print debug messages to the console, used for debugging
 
@@ -44,7 +45,7 @@ def debug_print(header, message):
     print(f"DEBUG: {header}:\n{message}")
 
 
-def search_for_pages(search_query=None):
+def search_for_pages(search_query: Optional[str]) -> dict[str, Any]:
     """
     Searches for pages in the user's Notion workspace
 
@@ -117,7 +118,7 @@ def search_for_pages(search_query=None):
         }
     """
 
-    search_params = {
+    search_params: dict[str, Any] = {
         "filter": {"value": "page", "property": "object"},
         "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
     }
@@ -147,7 +148,7 @@ def search_for_pages(search_query=None):
     return search_response.json()
 
 
-def generate_mention_section(mention_page_name):
+def generate_mention_section(mention_page_name: str) -> dict[str, Any]:
     """
     Create a mention section for the block.
 
@@ -160,17 +161,17 @@ def generate_mention_section(mention_page_name):
 
     response = search_for_pages(mention_page_name)
 
-    results = response["results"]
     # sometimes there exist page names that are substrings of other page
     # names, for instance when searching "HackerDAO" brings up 2 pages:
     # 'HackerDAO' and 'HackerDAO TODO'. In all these cases we know we
     # want the page with the exact name match `HackerDAO`, so we'll filter
     # down to just that one page
+    results = response["results"]
     matched_results = list(
         filter(
             lambda result: result["properties"]["title"]["title"][0]["plain_text"]
             == mention_page_name,
-            response["results"],
+            results,
         )
     )
     assert len(matched_results) == 1, (
@@ -199,7 +200,7 @@ def generate_mention_section(mention_page_name):
     return new_section
 
 
-def generate_text_section(section_text):
+def generate_text_section(section_text: str) -> dict[str, Any]:
     """
     Create a text section for the block.
 
@@ -224,7 +225,7 @@ def generate_text_section(section_text):
     return new_section
 
 
-def check_for_and_update_block(block_id, block):
+def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     """
     Check if a block contains any [[...]] literals, and if so,
     update the block in Notion so that all literal [[...]] are replaced with
@@ -335,12 +336,8 @@ def check_for_and_update_block(block_id, block):
             new_content.append(new_section)
 
     if not needs_update:
-        print(
-            (
-                "No literal [[...]] sections found in this block,"
-                " so we'll not update it."
-            )
-        )
+        # No literal [[...]] sections found in this block,
+        # so no need to update it
         return
 
     # this is the object we'll write to the Notion API to update the block
@@ -367,7 +364,7 @@ def check_for_and_update_block(block_id, block):
         patch(url, headers=HEADERS, json=new_content_block)
 
 
-def fetch_block_children(page_id):
+def fetch_block_children(page_id: str) -> dict[str, Any]:
     """
     Given a Page ID , return a dict keyed by
     all of the given page's block childrens' IDs, and the child's data
@@ -557,8 +554,6 @@ def fetch_block_children(page_id):
         response = get(url, headers=HEADERS)
         response = response.json()
 
-        debug_print("BLOCK RESPONSE", json.dumps(response, indent=4, sort_keys=True))
-
         for block in response["results"]:
             if block["type"] in BLOCK_TYPES_TO_PROCESS:
                 block_type = block["type"]
@@ -567,12 +562,6 @@ def fetch_block_children(page_id):
                     "type": block_type,
                     "content": block[block_type],
                 }
-                if block["has_children"]:
-                    debug_print(
-                        "NON PARAGRAPH WITH CHILDREN",
-                        json.dumps(response, indent=4, sort_keys=True),
-                    )
-                    sys.exit(0)
 
         has_more = response["has_more"]
         next_cursor = response["next_cursor"]
@@ -580,7 +569,7 @@ def fetch_block_children(page_id):
     return block_children
 
 
-def extract_page_name_and_id(page):
+def extract_page_name_and_id(page: dict[str, Any]) -> tuple[str, str]:
     """
     Helper function to extract the page name and ID from a page object.
     """
@@ -609,12 +598,11 @@ if __name__ == "__main__":
     while has_more_pages:
         # get paginated pages of metadata,
         # specifically the particular the page ID's
-        response = search_for_pages()
+        response = search_for_pages(None)
 
         for page in response["results"]:
             page_name, page_id = extract_page_name_and_id(page)
-            print(f"Page Name: {page_name}")
-            print(f"Page ID: {page_id}")
+            print(f"Page Name: {page_name}, Page ID: {page_id}")
 
             # process the first-layer children on that page
             # (TODO: recurse through block sub-children to get all data)
