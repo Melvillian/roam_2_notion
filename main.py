@@ -50,6 +50,28 @@ def debug_print(header: str, message: str | dict[str, Any]) -> None:
         print(f"DEBUG: {header}:\n{message}")
 
 
+def normalize_chars(text: str) -> str:
+    """
+    Given a string, replace all strange characters with their ascii equivalents
+
+    This is necessary because of symbols like an apostrophe that can be
+    represented in multiple ways (e.g. "’" and "'") and we want to use
+    the representation that will allow us to look up the correct pages
+    in Notion
+
+    Note: we may need to add more characters to this list in the future,
+    but for now it solves the problem we're facing
+    """
+
+    for i in range(len(text)):
+        # get the unicode code point for the current character
+        code_point = ord(text[i])
+        if code_point == 8217:  # unicode for right apostrophe
+            # replace it with the ascii equivalent
+            text = text[:i] + "'" + text[i + 1 :]
+    return text
+
+
 def search_for_page(page_name: str) -> tuple[str, str]:
     """
     Search for page id and url that matches the given page name
@@ -60,6 +82,11 @@ def search_for_page(page_name: str) -> tuple[str, str]:
     Returns:
         tuple[str, str]: Tuple of the page id and url, or raise Exception if no match found
     """
+
+    # some characters like apostrophe "'" have multiple representations
+    # in unicode, so normalize the page_name so we can properly compare
+    # it in the loop below
+    page_name = normalize_chars(page_name)
 
     search_params: dict[str, Any] = {
         "filter": {"value": "page", "property": "object"},
@@ -83,14 +110,12 @@ def search_for_page(page_name: str) -> tuple[str, str]:
         response = search_response.json()
 
         for result in response["results"]:
-            if (
-                # we use .lower() because Roam Research's page names were
-                # case insensitive, so a raw literal could be [[ai]] but
-                # the page name could be AI. So we need to make them both
-                # lowercase so that then we can do an exact == comparison
-                result["properties"]["title"]["title"][0]["plain_text"].lower()
-                == page_name.lower()
-            ):
+            # we use .lower() because Roam Research's page names were
+            # case insensitive, so a raw literal could be [[ai]] but
+            # the page name could be AI. So we need to make them both
+            # lowercase so that then we can do an exact == comparison
+            title = result["properties"]["title"]["title"][0]["plain_text"].lower()
+            if title == page_name.lower():
                 return (result["id"], result["url"])
 
         has_more = response["has_more"]
