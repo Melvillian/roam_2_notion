@@ -52,11 +52,7 @@ def debug_print(header: str, message: str | dict[str, Any]) -> None:
 
 def search_for_page(page_name: str) -> tuple[str, str]:
     """
-    Search for page id and url that exactly matches the given page name
-
-    Based on the Notion API key you're using and the pages that have been
-    shared with the key's integration, return a tuple of the page id and url
-    that exactly matches the given page name.
+    Search for page id and url that matches the given page name
 
     Args:
         page_name (str): Page name to search for
@@ -71,11 +67,12 @@ def search_for_page(page_name: str) -> tuple[str, str]:
         "query": page_name,
     }
 
+    # a single search query might result in multiple pages of results, so
+    # loop over the paginated Notion results, searching for a case-insensitive
+    # match so we can extract the id and url
     has_more = True
     next_cursor = None
 
-    # loop over the paginated Notion results, searching for an exact match
-    # so we can extract the id and url
     while has_more:
         if next_cursor:
             search_params["start_cursor"] = next_cursor
@@ -83,11 +80,17 @@ def search_for_page(page_name: str) -> tuple[str, str]:
         search_response = post(
             f"{NOTION_API_PREFIX}/search", json=search_params, headers=HEADERS
         )
-
         response = search_response.json()
 
         for result in response["results"]:
-            if result["properties"]["title"]["title"][0]["plain_text"] == page_name:
+            if (
+                # we use .lower() because Roam Research's page names were
+                # case insensitive, so a raw literal could be [[ai]] but
+                # the page name could be AI. So we need to make them both
+                # lowercase so that then we can do an exact == comparison
+                result["properties"]["title"]["title"][0]["plain_text"].lower()
+                == page_name.lower()
+            ):
                 return (result["id"], result["url"])
 
         has_more = response["has_more"]
