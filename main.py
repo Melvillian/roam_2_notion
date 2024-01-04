@@ -5,6 +5,10 @@ from lib.virtual_text import create_virtual_text
 from lib.request_rate_limiter import get, post, patch
 from typing import Any
 
+import time
+
+from requests import JSONDecodeError
+
 load_dotenv()
 
 NOTION_KEY = os.environ.get("NOTION_KEY")
@@ -382,9 +386,12 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
         for section in virtual_text:
             section_text = section[0]
             is_mention = section[1]
+
             new_section = (
                 generate_mention_section(section_text)
                 if is_mention
+                and "/"
+                not in section_text  # our script can't handle "/" page names, so skip them
                 else generate_text_section(section_text)
             )
             new_content.append(new_section)
@@ -639,25 +646,36 @@ if __name__ == "__main__":
 
     has_more_pages = True
     while has_more_pages:
-        # get paginated pages of metadata,
-        # specifically the particular the page ID's
-        response = search_for_pages()
+        # we wrap the main loop code in a try/except block
+        # because I've noticed the Notion API sporadically returns
+        # JSONDecodeErrors, but they are transitory, unimportant errors.
+        # So we can simply back off for 10 seconds, and then continue
+        # from the last cursor checkpoint
+        try:
+            # get paginated pages of metadata,
+            # specifically the particular the page ID's
+            response = search_for_pages()
 
-        for page in response["results"]:
-            page_name, page_id = extract_page_name_and_id(page)
-            print(f"Page Name: {page_name}, Page ID: {page_id}")
+            for page in response["results"]:
+                page_name, page_id = extract_page_name_and_id(page)
+                print(f"Page Name: {page_name}, Page ID: {page_id}")
 
-            # process the first-layer children on that page
-            # (TODO: recurse through block sub-children to get all data)
-            block_children = fetch_block_children(page_id)
-            for block_id, block in block_children.items():
-                check_for_and_update_block(block_id, block)
+                # process the first-layer children on that page
+                # (TODO: recurse through block sub-children to get all data)
+                block_children = fetch_block_children(page_id)
+                for block_id, block in block_children.items():
+                    check_for_and_update_block(block_id, block)
 
-        if response["has_more"]:
-            # save the cursor data in case the script fails partway
-            # and we need to resume from where we left off
-            with open(CURSOR_METADATA_FILENAME, "w") as f:
-                cursor_data = {"next_cursor": response["next_cursor"]}
-                json.dump(cursor_data, f)
+            if response["has_more"]:
+                # save the cursor data in case the script fails partway
+                # and we need to resume from where we left off
+                with open(CURSOR_METADATA_FILENAME, "w") as f:
+                    cursor_data = {"next_cursor": response["next_cursor"]}
+                    json.dump(cursor_data, f)
 
-        has_more_pages = response["has_more"]
+            has_more_pages = response["has_more"]
+        except JSONDecodeError as e:
+            print(f"JSONDecodeError: {e}")
+            time.sleep(10)
+
+    print("Done!")
