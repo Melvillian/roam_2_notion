@@ -87,6 +87,7 @@ def search_for_page(page_name: str) -> tuple[str, str]:
     # in unicode, so normalize the page_name so we can properly compare
     # it in the loop below
     page_name = normalize_chars(page_name)
+    page_name = page_name.lower()
 
     search_params: dict[str, Any] = {
         "filter": {"value": "page", "property": "object"},
@@ -115,7 +116,8 @@ def search_for_page(page_name: str) -> tuple[str, str]:
             # the page name could be AI. So we need to make them both
             # lowercase so that then we can do an exact == comparison
             title = result["properties"]["title"]["title"][0]["plain_text"].lower()
-            if title == page_name.lower():
+            title = normalize_chars(title)
+            if title == page_name:
                 return (result["id"], result["url"])
 
         has_more = response["has_more"]
