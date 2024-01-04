@@ -1,8 +1,6 @@
 import re
 
 BRACKET_PATTERN = r"\[\[(.*?)\]\]"
-LEFT_BRACKET_PATTERN = r"\[\["
-RIGHT_BRACKET_PATTERN = r"\]\]"
 
 
 def create_virtual_text(text: str) -> list[tuple[str, bool]]:
@@ -19,8 +17,8 @@ def create_virtual_text(text: str) -> list[tuple[str, bool]]:
         ('"Hello ', False), ('name', True), ('! My na', False), ('blah', True),
         ('me is ', False), ('Cody', True), ('..', False)
     ]
-    This virtual representation will be used to generate the new Notion block that
-    contains correctly formatted mentions, which is the whole
+    This virtual representation will be used to generate the new Notion block
+    that contains correctly formatted mentions, which is the whole
     purpose of this project.
 
     Args:
@@ -38,17 +36,12 @@ def create_virtual_text(text: str) -> list[tuple[str, bool]]:
     raw_virtual_text = list(filter(lambda x: x != "", raw_virtual_text))
 
     # now we have a list of strings split by the [[...]] mentions, but we need
-    # to mark each one as either being a mention or just regular plaintext. We
-    # know the elements alternate between one and the other, so we just need to
-    # determine whether the first element is a mention or a plaintext. We do
-    # that by checking the first characters in the input text, and if it starts
-    # with 2 left brackets, then the first element in the list is a mention,
-    # otherwise it's plaintext.
-    first_element_is_mention = text.startswith("[[")
+    # to mark each one as either being a mention or just regular plaintext.
+
     virtual_text = []
-    current_text_is_mention = first_element_is_mention
-    for mention_or_plaintext in raw_virtual_text:
-        virtual_text.append((mention_or_plaintext, current_text_is_mention))
-        current_text_is_mention = not current_text_is_mention
+    all_mentions = re.findall(BRACKET_PATTERN, text)
+    for t in raw_virtual_text:
+        is_mention = True if t in all_mentions else False
+        virtual_text.append((t, is_mention))
 
     return virtual_text
