@@ -646,6 +646,19 @@ def extract_page_name_and_id(page: dict[str, Any]) -> tuple[str, str]:
     return page_name, page_id
 
 
+def process_single_page(page_id: str) -> None:
+    """
+    A convenience function to process a single page.
+
+    Mostly used for debugging when a single page causes a
+    failure and you want to go back and manually process
+    that single page.
+    """
+    block_children = fetch_block_children(page_id)
+    for block_id, block in block_children.items():
+        check_for_and_update_block(block_id, block)
+
+
 if __name__ == "__main__":
     """
     Iterate through all of my Notion pages and their first-layer children,
