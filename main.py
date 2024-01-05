@@ -14,6 +14,10 @@ NOTION_KEY = os.environ.get("NOTION_KEY")
 NOTION_VERSION = "2021-08-16"
 NOTION_API_PREFIX = "https://api.notion.com/v1"
 CURSOR_METADATA_FILENAME = "cursor_metadata.json"
+SHARED_SEARCH_PARAMS: dict[str, Any] = {
+    "filter": {"value": "page", "property": "object"},
+    "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
+}
 
 # sometimes we fail for some reason on Notion's end,
 # and it is a transitory failure. So we retry a few times
@@ -102,11 +106,8 @@ def search_for_page(page_name: str) -> tuple[str, str]:
     page_name = normalize_chars(page_name)
     page_name = page_name.lower()
 
-    search_params: dict[str, Any] = {
-        "filter": {"value": "page", "property": "object"},
-        "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
-        "query": page_name,
-    }
+    search_params = SHARED_SEARCH_PARAMS
+    search_params["query"] = page_name
 
     # a single search query might result in multiple pages of results, so
     # loop over the paginated Notion results, searching for a case-insensitive
@@ -212,10 +213,7 @@ def search_for_pages() -> dict[str, Any]:
         }
     """
 
-    search_params: dict[str, Any] = {
-        "filter": {"value": "page", "property": "object"},
-        "sort": {"direction": "ascending", "timestamp": "last_edited_time"},
-    }
+    search_params = SHARED_SEARCH_PARAMS
 
     # we must be searching through all the pages, so this is the cursor
     # that will be used to fetch the next page of results
@@ -423,10 +421,10 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     patch(url, headers=HEADERS, json=new_content_block)
 
 
-def fetch_block_children(page_id: str) -> dict[str, Any]:
+def fetch_block_children(block_id: str) -> dict[str, Any]:
     """
-    Given a Page ID , return a dict keyed by
-    all of the given page's block childrens' IDs, and the child's data.
+    Given a Block ID (which may be a Page ID), return a dict keyed by
+    all of the given block/page's block IDs, and the child's data.
     This includes children of children, recursively (so we get all of the
     blocks in the page, not just the top level blocks).
 
@@ -605,7 +603,7 @@ def fetch_block_children(page_id: str) -> dict[str, Any]:
     has_more = True
     next_cursor = None
     block_children = {}
-    base_url = f"{NOTION_API_PREFIX}/blocks/{page_id}/children"
+    base_url = f"{NOTION_API_PREFIX}/blocks/{block_id}/children"
 
     while has_more:
         url = base_url
@@ -618,11 +616,19 @@ def fetch_block_children(page_id: str) -> dict[str, Any]:
         for block in response["results"]:
             if block["type"] in BLOCK_TYPES_TO_PROCESS:
                 block_type = block["type"]
+
                 block_children[block["id"]] = {
-                    "has_children": block["has_children"],
                     "type": block_type,
                     "content": block[block_type],
                 }
+
+                # recurse if there are any children, aggregating all the
+                # block and child block content into one dict
+                if block["has_children"]:
+                    debug_print("BLOCK", block["id"])
+                    sub_block_children = fetch_block_children(block["id"])
+                    for sub_block_id, sub_child in sub_block_children.items():
+                        block_children[sub_block_id] = sub_child
 
         has_more = response["has_more"]
         next_cursor = response["next_cursor"]
@@ -663,9 +669,9 @@ def process_single_page(page_id: str) -> None:
 
 if __name__ == "__main__":
     """
-    Iterate through all of my Notion pages and their first-layer children,
-    updating the page's Blocks to use mentions where now there are literal
-    [[...]] markers leftover from the Roam Research migration
+    Iterate through all of my Notion pages updating the page's Blocks
+    to use mentions where now there are literal [[...]] markers leftover
+    from the Roam Research migration
     """
 
     num_retries = 0
@@ -678,15 +684,13 @@ if __name__ == "__main__":
         # from the last cursor checkpoint
         try:
             # get paginated pages of metadata,
-            # specifically the particular the page ID's
+            # specifically the particular the pages' IDs
             response = search_for_pages()
-
             for page in response["results"]:
                 page_name, page_id = extract_page_name_and_id(page)
                 print(f"Page Name: {page_name}, Page ID: {page_id}")
 
-                # process the first-layer children on that page
-                # (TODO: recurse through block sub-children to get all data)
+                # process all of the page's blocks (including child blocks)
                 block_children = fetch_block_children(page_id)
                 for block_id, block in block_children.items():
                     check_for_and_update_block(block_id, block)
@@ -720,4 +724,4 @@ if __name__ == "__main__":
                 )
                 sys.exit(0)
 
-    print("Done!")
+    print("Done! Don't forget to delete the ./cursor_metadata.json file")
