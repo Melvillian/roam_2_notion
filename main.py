@@ -6,12 +6,13 @@ from lib.request_rate_limiter import get, post, patch
 from typing import Any
 import time
 import sys
+import copy
 from requests import JSONDecodeError, HTTPError
 
 load_dotenv()
 
 NOTION_KEY = os.environ.get("NOTION_KEY")
-NOTION_VERSION = "2021-08-16"
+NOTION_VERSION = "2022-06-28"
 NOTION_API_PREFIX = "https://api.notion.com/v1"
 CURSOR_METADATA_FILENAME = "cursor_metadata.json"
 SHARED_SEARCH_PARAMS: dict[str, Any] = {
@@ -106,7 +107,7 @@ def search_for_page(page_name: str) -> tuple[str, str]:
     page_name = normalize_chars(page_name)
     page_name = page_name.lower()
 
-    search_params = SHARED_SEARCH_PARAMS
+    search_params = copy.deepcopy(SHARED_SEARCH_PARAMS)
     search_params["query"] = page_name
 
     # a single search query might result in multiple pages of results, so
@@ -137,8 +138,7 @@ def search_for_page(page_name: str) -> tuple[str, str]:
         has_more = response["has_more"]
         next_cursor = response["next_cursor"]
 
-    print(f"No page found with name {page_name}")
-    raise NoPageFoundException("Aborting...")
+    raise NoPageFoundException(f"No page found with name {page_name}")
 
 
 def search_for_pages() -> dict[str, Any]:
@@ -213,7 +213,7 @@ def search_for_pages() -> dict[str, Any]:
         }
     """
 
-    search_params = SHARED_SEARCH_PARAMS
+    search_params = copy.deepcopy(SHARED_SEARCH_PARAMS)
 
     # we must be searching through all the pages, so this is the cursor
     # that will be used to fetch the next page of results
@@ -362,7 +362,7 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     """
 
     old_content = block["content"]
-    if not old_content["text"]:
+    if not old_content["rich_text"]:
         # this is a boring empty block, so we do not update
         # anything and simply return
         return
@@ -374,7 +374,7 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     # start building the new block content that we'll use to overwrite
     # (i.e. overwrite) the old block contents
     new_content = []
-    for content_section in old_content["text"]:
+    for content_section in old_content["rich_text"]:
         virtual_text = create_virtual_text(content_section["plain_text"])
 
         if not any(tup[1] for tup in virtual_text):
@@ -413,7 +413,7 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
     new_content_block = {
         block_type: {
             "color": old_content["color"],
-            "text": new_content,
+            "rich_text": new_content,
         }
     }
 
@@ -441,7 +441,7 @@ def fetch_block_children(block_id: str) -> dict[str, Any]:
                 "has_children": false,
                 "content": {
                     "color": "default",
-                    "text": []
+                    "rich_text": []
                 },
                 "type": "paragraph"
             },
@@ -449,7 +449,7 @@ def fetch_block_children(block_id: str) -> dict[str, Any]:
                 "has_children": false,
                 "content": {
                     "color": "default",
-                    "text": [
+                    "rich_text": [
                         {
                             "annotations": {
                                 "bold": false,
@@ -566,7 +566,7 @@ def fetch_block_children(block_id: str) -> dict[str, Any]:
                 "has_children": false,
                 "content": {
                     "color": "default",
-                    "text": []
+                    "rich_text": []
                 },
                 "type": "paragraph"
             },
@@ -574,7 +574,7 @@ def fetch_block_children(block_id: str) -> dict[str, Any]:
                 "has_children": false,
                 "content": {
                     "color": "default",
-                    "text": [
+                    "rich_text": [
                         {
                             "annotations": {
                                 "bold": false,
@@ -625,7 +625,6 @@ def fetch_block_children(block_id: str) -> dict[str, Any]:
                 # recurse if there are any children, aggregating all the
                 # block and child block content into one dict
                 if block["has_children"]:
-                    debug_print("BLOCK", block["id"])
                     sub_block_children = fetch_block_children(block["id"])
                     for sub_block_id, sub_child in sub_block_children.items():
                         block_children[sub_block_id] = sub_child
