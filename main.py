@@ -426,7 +426,9 @@ def check_for_and_update_block(block_id: str, block: dict[str, Any]) -> None:
 def fetch_block_children(page_id: str) -> dict[str, Any]:
     """
     Given a Page ID , return a dict keyed by
-    all of the given page's block childrens' IDs, and the child's data
+    all of the given page's block childrens' IDs, and the child's data.
+    This includes children of children, recursively (so we get all of the
+    blocks in the page, not just the top level blocks).
 
     The important value will be the `content` field, which contains an
     array of objects of type `text` and `mention` (there could also be equation
