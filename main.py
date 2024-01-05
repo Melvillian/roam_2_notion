@@ -4,9 +4,8 @@ from dotenv import load_dotenv
 from lib.virtual_text import create_virtual_text
 from lib.request_rate_limiter import get, post, patch
 from typing import Any
-
 import time
-
+import sys
 from requests import JSONDecodeError
 
 load_dotenv()
@@ -15,6 +14,12 @@ NOTION_KEY = os.environ.get("NOTION_KEY")
 NOTION_VERSION = "2021-08-16"
 NOTION_API_PREFIX = "https://api.notion.com/v1"
 CURSOR_METADATA_FILENAME = "cursor_metadata.json"
+
+# sometimes we fail for some reason on Notion's end,
+# and it is a transitory failure. So we retry a few times
+# but after a certain number of failed tries we abort
+SLEEP_TIME_FAILURE_SECS = 10
+MAX_FAILURE_TRIES = 10
 
 # TODO: make use of matching via something like:
 # https://stackoverflow.com/questions/16258553/how-can-i-define-algebraic-data-types-in-python
@@ -37,6 +42,10 @@ HEADERS = {
     "Notion-Version": NOTION_VERSION,
 }
 # TODO: handle non-200 responses everywhere
+
+
+class NoPageFoundException(Exception):
+    pass
 
 
 def debug_print(header: str, message: str | dict[str, Any]) -> None:
@@ -128,7 +137,7 @@ def search_for_page(page_name: str) -> tuple[str, str]:
         next_cursor = response["next_cursor"]
 
     print(f"No page found with name {page_name}")
-    raise Exception("Aborting...")
+    raise NoPageFoundException("Aborting...")
 
 
 def search_for_pages() -> dict[str, Any]:
@@ -644,6 +653,7 @@ if __name__ == "__main__":
     [[...]] markers leftover from the Roam Research migration
     """
 
+    num_retries = 0
     has_more_pages = True
     while has_more_pages:
         # we wrap the main loop code in a try/except block
@@ -676,6 +686,23 @@ if __name__ == "__main__":
             has_more_pages = response["has_more"]
         except JSONDecodeError as e:
             print(f"JSONDecodeError: {e}")
-            time.sleep(10)
+            time.sleep(SLEEP_TIME_FAILURE_SECS)
+            num_retries += 1
+            if num_retries > MAX_FAILURE_TRIES:
+                print(
+                    f"failed {MAX_FAILURE_TRIES} times, giving up",
+                    file=sys.stderr,
+                )
+                sys.exit(0)
+        except NoPageFoundException as e:
+            print(f"NoPageFoundException: {e}")
+            time.sleep(SLEEP_TIME_FAILURE_SECS)
+            num_retries += 1
+            if num_retries > MAX_FAILURE_TRIES:
+                print(
+                    f"failed {MAX_FAILURE_TRIES} times, giving up",
+                    file=sys.stderr,
+                )
+                sys.exit(0)
 
     print("Done!")
