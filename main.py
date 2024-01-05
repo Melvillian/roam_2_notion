@@ -6,7 +6,7 @@ from lib.request_rate_limiter import get, post, patch
 from typing import Any
 import time
 import sys
-from requests import JSONDecodeError
+from requests import JSONDecodeError, HTTPError
 
 load_dotenv()
 
@@ -23,7 +23,7 @@ SHARED_SEARCH_PARAMS: dict[str, Any] = {
 # and it is a transitory failure. So we retry a few times
 # but after a certain number of failed tries we abort
 SLEEP_TIME_FAILURE_SECS = 10
-MAX_FAILURE_TRIES = 10
+MAX_FAILURE_TRIES = 100
 
 # TODO: make use of matching via something like:
 # https://stackoverflow.com/questions/16258553/how-can-i-define-algebraic-data-types-in-python
@@ -703,18 +703,8 @@ if __name__ == "__main__":
                     json.dump(cursor_data, f)
 
             has_more_pages = response["has_more"]
-        except JSONDecodeError as e:
-            print(f"JSONDecodeError: {e}")
-            time.sleep(SLEEP_TIME_FAILURE_SECS)
-            num_retries += 1
-            if num_retries > MAX_FAILURE_TRIES:
-                print(
-                    f"failed {MAX_FAILURE_TRIES} times, giving up",
-                    file=sys.stderr,
-                )
-                sys.exit(0)
-        except NoPageFoundException as e:
-            print(f"NoPageFoundException: {e}")
+        except (JSONDecodeError, NoPageFoundException, HTTPError) as e:
+            print(f"Transitory error found while processing:\n{e}")
             time.sleep(SLEEP_TIME_FAILURE_SECS)
             num_retries += 1
             if num_retries > MAX_FAILURE_TRIES:
