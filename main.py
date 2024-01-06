@@ -50,21 +50,6 @@ class NoPageFoundException(Exception):
     pass
 
 
-def debug_print(header: str, message: str | dict[str, Any]) -> None:
-    """
-    Simple helper function to print debug messages to the console
-    used for debugging
-
-    Should delete all uses of this before deploying to production
-    """
-    if isinstance(message, dict):
-        # it's a json blob, so pretty print it
-        print(f"DEBUG: {header}:\n{json.dumps(message, indent=4, sort_keys=True)}")
-    else:
-        # it's not a json blob, so just print it
-        print(f"DEBUG: {header}:\n{message}")
-
-
 def normalize_chars(text: str) -> str:
     """
     Given a string, replace all strange characters with their ascii equivalents
