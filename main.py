@@ -26,8 +26,6 @@ SHARED_SEARCH_PARAMS: dict[str, Any] = {
 SLEEP_TIME_FAILURE_SECS = 10
 MAX_FAILURE_TRIES = 100
 
-# TODO: make use of matching via something like:
-# https://stackoverflow.com/questions/16258553/how-can-i-define-algebraic-data-types-in-python
 # These are all of the Notion block types that we believe contain [[...]]
 # literals and we will want to process. You can see the full list here:
 # https://developers.notion.com/reference/block#block-type-objects
@@ -46,7 +44,6 @@ HEADERS = {
     "Content-Type": "application/json",
     "Notion-Version": NOTION_VERSION,
 }
-# TODO: handle non-200 responses everywhere
 
 
 class NoPageFoundException(Exception):

@@ -27,27 +27,3 @@ You can think of Notion being a directed cyclic graph, where each vertex is a
 block and each edge is a child block. Each vertex gets covered if it has no
 [[...]] text contained within it. This script traverses the graph, coloring each
 vertex until each vertex has been covered.
-
-### TODO
-
-- [x] check a page which contains backlinks and see what they look like in the
-      API's response.
-
-- [x] try to add a backlink to an existing page, and see if it correctly updates
-      the backlink
-
-- [x] handle pagination of the page search results
-
-- [ ] handle blocks with children by recursing on the children, see:
-      https://developers.notion.com/docs/working-with-page-content#reading-nested-blocks
-
-- [ ] handle non-paragraph blocks
-
-- [ ] handle non-200 responses
-
-- [ ] add a pyproject file, like described here
-      https://packaging.python.org/en/latest/guides/writing-pyproject-toml/ and
-      for example here:
-      https://github.com/asweigart/pyscreeze/blob/master/pyproject.toml
-
-- [ ] go back through and add mypy types
