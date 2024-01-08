@@ -1,7 +1,7 @@
 # roam_2_notion
 
 A small script for converting any Notion pages that have been imported from Roam
-(which uses the literal `[[some category]]` or backlinks) to use theproper
+(which uses the literal `[[some category]]` or backlinks) to use the proper
 Notion mentions, which use the `@some category` notation. With this script, you
 can have pretty much all of the benefits of Roam, but with all of the benefits
 of Notion!
@@ -39,7 +39,7 @@ strings)
 ## Background
 
 I originally had all of my personal notes in Roam Research, which uses the
-`[[some category]]` text to link to other pages. I decuded to switch to Notion
+`[[some category]]` text to link to other pages. I decided to switch to Notion
 because I liked its design, as well as the ability to make any page a public
 webpage. So I exported all of my Roam Research notes into markdown files on my
 local machine, and then imported these markdown files into Notion. However, the
@@ -59,7 +59,7 @@ should be able to use this script as well
    `[[...]]`, and replace each of those literal `[[...]]` text sections with a
    `@` mention
 
-You can think of Notion being a directed cyclic graph, where each vertex is a
-block and each edge is a child block. Each vertex gets colored if it has no
-`[[...]]` text contained within it. This script traverses the graph, coloring
-each vertex until each vertex has been covered.
+For you math-types out there: you can think of Notion being a directed cyclic
+graph, where each vertex is a block and each edge is a child block. Each vertex
+gets colored if it has no `[[...]]` text contained within it. This script
+traverses the graph, coloring each vertex until each vertex has been covered.
