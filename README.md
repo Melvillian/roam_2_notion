@@ -22,7 +22,7 @@ strings)
 3. Create and activate a Python virtual env:
    `python3 -m venv /path/to/virtualenvs/roam_2_notion && source //path/to/virtualenvs/roam_2_notion/bin/activate`
 4. Install dependencies with: `python3 -m pip install -r requirements.txt`
-5. Run the script with: `python roam_2_notion.py`
+5. Run the script with: `python main.py`
    1. The script runs for many minutes, depending on how many pages you have. It
       will print out the page title and page id for each page it is currently
       processing.
